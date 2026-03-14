@@ -121,7 +121,7 @@ class MiniAgent:
                     current_answer += delta.content
                     render_group = self._get_render_group(current_thought, current_answer, tool_calls)
                     live.update(render_group)
-        if current_answer.strip():
+        if current_answer.strip() and tool_calls == "":
             status.stop()
             message = {"role": "assistant", "content": current_answer}
             self._messages.append(message)
