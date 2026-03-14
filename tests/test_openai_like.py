@@ -45,6 +45,7 @@ def test_openai_like_weather_tool(openai_client, current_model):
     result = weather_tool.call(func_args)
     assert result.is_error is False
 
+
 @pytest.mark.skip
 def test_openai_like_ask_user_tool(openai_client, current_model):
     ask_user_tool = AskUserTool()
@@ -76,3 +77,20 @@ def test_openai_like_execute_shell_tool(openai_client, current_model):
     func_args = tool_call.function.arguments
     result = execute_shell_tool.call(func_args)
     assert result.is_error is False
+
+
+def test_openai_like_stream_chat(openai_client, current_model):
+    weather_tool = WeatherTool()
+    tools = [weather_tool.to_schema()]
+    client = OpenAiLike(client=openai_client, tools=tools)
+    messages = [{"role": "user", "content": "上海天气怎么样"}]
+    generator = client.stream_chat(messages=messages, model=current_model)
+
+    for event in generator:
+        delta = event.choices[0].delta
+        if hasattr(delta, "reasoning_content"):
+            print(delta.reasoning_content)
+        elif delta.tool_calls is not None:
+            print(delta.tool_calls[0].function)
+        else:
+            print(delta.content)

@@ -27,8 +27,8 @@ class ExecuteShellTool(ToolBase):
                 timeout=SHELL_EXECUTE_TIMEOUT,
             )
             if result.stderr:
-                return ToolReturnValue(output=result.stdout, is_error=True)
-            return ToolReturnValue(output=result.stderr, is_error=False)
+                return ToolReturnValue(output=result.stderr, is_error=True)
+            return ToolReturnValue(output=result.stdout, is_error=False)
         except subprocess.TimeoutExpired:
             return ToolReturnValue(
                 output=f"执行命令：{params.command} 超时({SHELL_EXECUTE_TIMEOUT}s)",

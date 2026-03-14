@@ -59,10 +59,10 @@ class ToolSet:
 
     def __init__(self, tools: list[ToolBase] = None):
         self._tools = dict()
-        
+
         if tools is None:
             return
-        
+
         for tool in tools:
             self.add_tool(tool)
 
@@ -77,6 +77,6 @@ class ToolSet:
                 output=f"Tool ({tool_name}) not exists.", is_error=True
             )
         return self._tools[tool_name].call(func_args)
-    
+
     def to_schemas(self):
         return [tool.to_schema() for tool in self._tools.values()]

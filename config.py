@@ -45,12 +45,8 @@ class ModelConfig(BaseModel):
 class ProviderOptions(BaseModel):
     """Options for a provider"""
 
-    base_url: str = Field(
-        alias="baseURL", description="Base URL for the provider API"
-    )
-    api_key: str = Field(
-        alias="apiKey", description="API key for the provider"
-    )
+    base_url: str = Field(alias="baseURL", description="Base URL for the provider API")
+    api_key: str = Field(alias="apiKey", description="API key for the provider")
 
 
 class ProviderConfig(BaseModel):

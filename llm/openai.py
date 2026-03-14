@@ -14,3 +14,9 @@ class OpenAiLike:
         )
         message = response.choices[0].message
         return message
+
+    def stream_chat(self, messages: list[dict], model: str):
+        response = self.client.chat.completions.create(
+            model=model, messages=messages, tools=self.tools, stream=True
+        )
+        return response
