@@ -26,7 +26,7 @@ class ExecuteShellTool(ToolBase):
                 text=True,
                 timeout=SHELL_EXECUTE_TIMEOUT,
             )
-            if result.stderr:
+            if result.returncode != 0:
                 return ToolReturnValue(output=result.stderr, is_error=True)
             return ToolReturnValue(output=result.stdout, is_error=False)
         except subprocess.TimeoutExpired:
