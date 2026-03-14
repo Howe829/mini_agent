@@ -49,7 +49,7 @@ class MiniAgent:
                         response = self._client.chat.completions.create(
                             model=self._model,
                             messages=self._messages,
-                            tools=self._tool_schemas,
+                            tools=self.tool_set.to_schemas(),
                         )
                     message = response.choices[0].message
                     self._messages.append(message)

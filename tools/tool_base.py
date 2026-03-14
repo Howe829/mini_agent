@@ -75,3 +75,6 @@ class ToolSet:
                 output=f"Tool ({tool_name}) not exists.", is_error=True
             )
         return self._tools[tool_name].call(func_args)
+    
+    def to_schemas(self):
+        return [tool.to_schema() for tool in self._tools.values()]
