@@ -102,12 +102,12 @@ class MiniAgent:
                     }
                     self._messages.append(message)
                     for tool in delta.tool_calls:
-                        with console.status(f"Using Tool: {tool.function.name}({tool.function.arguments})", spinner="dots3"):
+                        with console.status(f"Using {tool.function.name}", spinner="dots3"):
                             start = time.perf_counter()
                             result = self.tool_set.call_tool(
                                 tool.function.name, tool.function.arguments
                             )
-                        tool_calls.append(f" Used {tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
+                        tool_calls.append(f"Used {tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
