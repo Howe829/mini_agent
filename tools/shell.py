@@ -1,6 +1,6 @@
 import subprocess
 from pydantic import BaseModel, Field
-from typing import Type, override
+from typing import Type, override, Optional
 
 from tools.tool_base import ToolBase, ToolReturnValue
 
@@ -14,6 +14,7 @@ class ExecuteShellToolParams(BaseModel):
 class ExecuteShellTool(ToolBase):
     name: str = "execute_shell_tool"
     description: str = "用以执行shell终端命令的工具"
+    alias: Optional[str] = "执行shell命令"
     params_class: Type[BaseModel] = ExecuteShellToolParams
 
     @override

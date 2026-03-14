@@ -1,15 +1,17 @@
-from config import load_config, MiniAgentConfig
+import time
 from openai import OpenAI
 from rich.console import Console, Group
 from rich.markdown import Markdown
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 
+from config import load_config, MiniAgentConfig
 from tools.tool_base import ToolSet
 from llm.openai import OpenAiLike
 from rich.live import Live
 from rich.style import Style
 from rich.panel import Panel
+from rich.rule import Rule
 
 
 console = Console()
@@ -84,7 +86,7 @@ class MiniAgent:
             )
             current_thought = ""
             current_answer = ""
-            tool_calls = ""
+            tool_calls = []
             for event in generator:
                 delta = event.choices[0].delta
                 if hasattr(delta, "reasoning_content"):
@@ -100,14 +102,12 @@ class MiniAgent:
                     }
                     self._messages.append(message)
                     for tool in delta.tool_calls:
-                        result = self.tool_set.call_tool(
-                            tool.function.name, tool.function.arguments
-                        )
-                        tool_calls += f"""
-                            Used Tool:
-                            - tool name: {tool.function.name}
-                            - tool args: {tool.function.arguments}
-                            """
+                        with console.status(f"Using Tool: {tool.function.name}({tool.function.arguments})", spinner="dots3"):
+                            start = time.perf_counter()
+                            result = self.tool_set.call_tool(
+                                tool.function.name, tool.function.arguments
+                            )
+                        tool_calls.append(f" Used Tool:{tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
@@ -120,8 +120,8 @@ class MiniAgent:
                 else:
                     current_answer += delta.content
                     render_group = self._get_render_group(current_thought, current_answer, tool_calls)
-                    live.update(render_group)
-        if current_answer.strip() and tool_calls == "":
+                    live.update(render_group, refresh=True)
+        if current_answer.strip() and tool_calls == []:
             status.stop()
             message = {"role": "assistant", "content": current_answer}
             self._messages.append(message)
@@ -131,6 +131,7 @@ class MiniAgent:
     
     def _get_render_group(self, current_thought, current_answer, tool_calls):
         if tool_calls:
+            rules = [Rule(i, style="dim") for i in tool_calls]
             return Group(
                 # 思考内容已经完成，保持浅色显示
                 Panel(
@@ -139,11 +140,7 @@ class MiniAgent:
                     style="dim",
                     border_style="grey23",
                 ),
-                Panel(
-                    tool_calls,
-                    title="[italic]Used Tool[/italic]",
-                    style="grey50",
-                ),
+                *rules,
                 Markdown(current_answer),
             )
         return Group(

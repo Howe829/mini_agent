@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Type
+from typing import Type, Optional
 from abc import ABC, abstractmethod
 
 _DEFAULT_TOOL_OUTPUT_MAX_LEN = 5000
@@ -27,6 +27,7 @@ class ToolReturnValue(BaseModel):
 class ToolBase(ABC):
     name: str
     description: str
+    alias: Optional[str]
     params_class: Type[BaseModel]
 
     def to_schema(self):
