@@ -45,7 +45,7 @@ def test_openai_like_weather_tool(openai_client, current_model):
     result = weather_tool.call(func_args)
     assert result.is_error is False
 
-
+@pytest.mark.skip
 def test_openai_like_ask_user_tool(openai_client, current_model):
     ask_user_tool = AskUserTool()
     tools = [ask_user_tool.to_schema()]

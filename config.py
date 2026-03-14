@@ -45,11 +45,11 @@ class ModelConfig(BaseModel):
 class ProviderOptions(BaseModel):
     """Options for a provider"""
 
-    base_url: Optional[str] = Field(
-        alias="baseURL", default=None, description="Base URL for the provider API"
+    base_url: str = Field(
+        alias="baseURL", description="Base URL for the provider API"
     )
-    api_key: Optional[str] = Field(
-        alias="apiKey", default=None, description="API key for the provider"
+    api_key: str = Field(
+        alias="apiKey", description="API key for the provider"
     )
 
 
@@ -57,7 +57,7 @@ class ProviderConfig(BaseModel):
     """Configuration for a provider"""
 
     name: str = Field(..., description="Display name of the provider")
-    options: ProviderOptions = Field(default=None, description="Provider options")
+    options: ProviderOptions = Field(description="Provider options")
     models: Dict[str, ModelConfig] = Field(
         ..., description="Available models for this provider"
     )
@@ -91,7 +91,7 @@ class MiniAgentConfig(BaseModel):
             data = json.load(f)
         return cls(**data)
 
-    def get_provider(self, provider_id: str) -> ProviderConfig:
+    def get_provider(self, provider_id: str) -> ProviderConfig | None:
         """Get a specific provider by ID"""
         return self.provider.get(provider_id)
 
@@ -130,6 +130,8 @@ if __name__ == "__main__":
 
     for provider_id in config.list_providers():
         provider = config.get_provider(provider_id)
+        if provider is None:
+            continue
         print(f"\n📦 Provider: {provider_id}")
         print(f"   Name: {provider.name}")
         if provider.options:
@@ -139,6 +141,8 @@ if __name__ == "__main__":
         print(f"   Available models:")
         for model_id in config.list_models(provider_id):
             model = config.get_model(provider_id, model_id)
+            if model is None:
+                continue
             print(f"      • {model_id}: {model.name}")
             if model.options and model.options.thinking:
                 print(

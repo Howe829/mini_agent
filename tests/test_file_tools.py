@@ -10,6 +10,6 @@ def test_read_file_tool():
 
 def test_write_file_tool():
     write_file_tool = WriteFileTool()
-    func_args = r'{"path": "./tmp/temp_file.txt", "content": "Hello, world!\n"}'
+    func_args = r'{"path": "/tmp/temp_file.txt", "content": "Hello, world!\n"}'
     result = write_file_tool.call(func_args)
     assert result.is_error is False
