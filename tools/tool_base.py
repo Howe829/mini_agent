@@ -58,6 +58,8 @@ class ToolSet:
     _tools: dict[str, ToolBase]
 
     def __init__(self, tools: list[ToolBase] = None):
+        self._tools = dict()
+        
         if tools is None:
             return
         
