@@ -107,7 +107,7 @@ class MiniAgent:
                             result = self.tool_set.call_tool(
                                 tool.function.name, tool.function.arguments
                             )
-                        tool_calls.append(f" Used Tool:{tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
+                        tool_calls.append(f" Used {tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
