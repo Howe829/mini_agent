@@ -84,19 +84,12 @@ class MiniAgent:
             )
             current_thought = ""
             current_answer = ""
+            tool_calls = ""
             for event in generator:
                 delta = event.choices[0].delta
                 if hasattr(delta, "reasoning_content"):
                     current_thought += delta.reasoning_content
-                    render_group = Group(
-                        Panel(
-                            current_thought,
-                            title="[italic]思考内容[/italic]",
-                            style="grey50",
-                            border_style="grey23",
-                        ),
-                        Markdown(current_answer),
-                    )
+                    render_group = self._get_render_group(current_thought, current_answer, tool_calls)
                     live.update(render_group)
                 elif delta.tool_calls is not None:
                     status.stop()
@@ -110,9 +103,11 @@ class MiniAgent:
                         result = self.tool_set.call_tool(
                             tool.function.name, tool.function.arguments
                         )
-                        console.print(
-                            f"Used Tool: {tool.function.name}({tool.function.arguments})"
-                        )
+                        tool_calls += f"""
+                            Used Tool:
+                            - tool name: {tool.function.name}
+                            - tool args: {tool.function.arguments}
+                            """
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
@@ -124,16 +119,7 @@ class MiniAgent:
                         )
                 else:
                     current_answer += delta.content
-                    render_group = Group(
-                        # 思考内容已经完成，保持浅色显示
-                        Panel(
-                            current_thought,
-                            title="[italic]思考内容[/italic]",
-                            style="dim",
-                            border_style="grey23",
-                        ),
-                        Markdown(current_answer),
-                    )
+                    render_group = self._get_render_group(current_thought, current_answer, tool_calls)
                     live.update(render_group)
         if current_answer.strip():
             status.stop()
@@ -142,3 +128,31 @@ class MiniAgent:
             return False
 
         return True
+    
+    def _get_render_group(self, current_thought, current_answer, tool_calls):
+        if tool_calls:
+            return Group(
+                # 思考内容已经完成，保持浅色显示
+                Panel(
+                    current_thought,
+                    title="[italic]思考内容[/italic]",
+                    style="dim",
+                    border_style="grey23",
+                ),
+                Panel(
+                    tool_calls,
+                    title="[italic]Used Tool[/italic]",
+                    style="grey50",
+                ),
+                Markdown(current_answer),
+            )
+        return Group(
+            # 思考内容已经完成，保持浅色显示
+            Panel(
+                current_thought,
+                title="[italic]思考内容[/italic]",
+                style="dim",
+                border_style="grey23",
+            ),
+            Markdown(current_answer),
+        )
