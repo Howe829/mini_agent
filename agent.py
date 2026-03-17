@@ -1,4 +1,5 @@
 import time
+import json
 from openai import OpenAI
 from rich.console import Console, Group
 from rich.markdown import Markdown
@@ -78,6 +79,13 @@ class MiniAgent:
             console.print(content)
             return False
 
+    def _is_json_structured(self, _str):
+        try:
+            result = json.loads(_str)
+            return isinstance(result, (dict, list))
+        except (ValueError, TypeError):
+            return False
+
     def _call_llm_stream(self):
         with Live(Markdown(""), console=console, refresh_per_second=10) as live:
             status = console.status(f"Thinking...", spinner="line")
@@ -87,7 +95,7 @@ class MiniAgent:
             )
             current_thought = ""
             current_answer = ""
-            tool_calls = []
+            tool_call_infos = []
             usage_info = None
             for event in generator:
                 delta = event.choices[0].delta
@@ -110,7 +118,7 @@ class MiniAgent:
                             expand=False,
                         )
                         render_group = self._get_render_group(
-                            current_thought, current_answer, tool_calls, usage_info
+                            current_thought, current_answer, tool_call_infos, usage_info
                         )
                         live.update(render_group)
                     if finish_reason != "tool_calls":
@@ -121,52 +129,72 @@ class MiniAgent:
                 if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
                     current_thought += delta.reasoning_content
                     render_group = self._get_render_group(
-                        current_thought, current_answer, tool_calls, usage_info
+                        current_thought, current_answer, tool_call_infos, usage_info
                     )
                     live.update(render_group)
+
                 elif delta.tool_calls is not None:
-                    status.stop()
                     message = {
                         "role": "assistant",
                         "content": current_thought,
                         "tool_calls": delta.tool_calls,
                     }
                     self._messages.append(message)
-                    for tool in delta.tool_calls:
+                    final_tool_calls = {}
+                    for tool_call_ in delta.tool_calls:
+                        index = tool_call_.index
+                        if index not in final_tool_calls:
+                            final_tool_calls[index] = tool_call_
+                        arguments = final_tool_calls[index].function.arguments
+
+                        if self._is_json_structured(arguments):
+                            continue
+
+                        arguments += tool_call_.function.arguments
+
+                    for tool_call in final_tool_calls.values():
                         with console.status(
-                            f"Using {tool.function.name}", spinner="dots3"
+                            f"Using {tool_call.function.name}", spinner="dots3"
                         ):
                             start = time.perf_counter()
                             result = self.tool_set.call_tool(
-                                tool.function.name, tool.function.arguments
+                                tool_call.function.name, tool_call.function.arguments
                             )
-                        tool_calls.append(
-                            f"Used {tool.function.name} Time: {time.perf_counter()-start:.2f}"
+                        tool_call_infos.append(
+                            Columns(
+                                [
+                                    Text.from_markup(
+                                        f"[dim]Used: {tool_call.function.name}"
+                                    ),
+                                    Text.from_markup(
+                                        f"[dim]Time: {time.perf_counter()-start:.2f}s"
+                                    ),
+                                ],
+                                equal=False,
+                                expand=False,
+                            )
                         )
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
                             {
                                 "role": "tool",
-                                "tool_call_id": tool.id,
+                                "tool_call_id": tool_call.id,
                                 "content": result.output,
                             }
                         )
                 else:
                     current_answer += delta.content
                     render_group = self._get_render_group(
-                        current_thought, current_answer, tool_calls, usage_info
+                        current_thought, current_answer, tool_call_infos, usage_info
                     )
                     live.update(render_group, refresh=True)
 
         return True
 
     def _get_render_group(
-        self, current_thought, current_answer, tool_calls, usage_info
+        self, current_thought, current_answer, tool_call_infos, usage_info
     ):
-        rules = []
-        if tool_calls:
-            rules = [Rule(i, style="dim") for i in tool_calls]
         return Group(
             Panel(
                 current_thought,
@@ -174,7 +202,7 @@ class MiniAgent:
                 style="dim",
                 border_style="grey23",
             ),
-            *rules,
+            *tool_call_infos,
             Markdown(current_answer),
             usage_info or "",
         )
