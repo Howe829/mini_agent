@@ -6,7 +6,7 @@ _DEFAULT_TOOL_OUTPUT_MAX_LEN = 5000
 
 
 class ToolReturnValue(BaseModel):
-    output: str = Field(description="工具输出", max_length=_DEFAULT_TOOL_OUTPUT_MAX_LEN)
+    output: str = Field(description="工具输出")
     is_error: bool = Field(description="工具执行是否出错")
 
     @field_validator("output", mode="before")

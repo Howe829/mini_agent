@@ -87,10 +87,11 @@ def test_openai_like_stream_chat(openai_client, current_model):
     generator = client.stream_chat(messages=messages, model=current_model)
 
     for event in generator:
-        delta = event.choices[0].delta
-        if hasattr(delta, "reasoning_content"):
-            print(delta.reasoning_content)
-        elif delta.tool_calls is not None:
-            print(delta.tool_calls[0].function)
-        else:
-            print(delta.content)
+        print(event)
+        # delta = event.choices[0].delta
+        # if hasattr(delta, "reasoning_content"):
+        #     print(delta.reasoning_content)
+        # elif delta.tool_calls is not None:
+        #     print(delta.tool_calls[0].function)
+        # else:
+        #     print(delta.content)

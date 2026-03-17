@@ -12,7 +12,8 @@ from rich.live import Live
 from rich.style import Style
 from rich.panel import Panel
 from rich.rule import Rule
-
+from rich.columns import Columns
+from rich.text import Text
 
 console = Console()
 
@@ -87,11 +88,40 @@ class MiniAgent:
             current_thought = ""
             current_answer = ""
             tool_calls = []
+            usage_info = None
             for event in generator:
                 delta = event.choices[0].delta
+                finish_reason = event.choices[0].finish_reason
+                if finish_reason is not None:
+                    status.stop()
+                    usage = event.usage
+                    usage_info = Columns(
+                        [
+                            Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
+                            Text.from_markup(
+                                f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
+                            ),
+                            Text.from_markup(
+                                f"[dim]Time:[/] [green]{time.time()-event.created:.2f}s[/]"
+                            ),
+                        ],
+                        equal=False,
+                        expand=False,
+                    )
+                    render_group = self._get_render_group(
+                        current_thought, current_answer, tool_calls, usage_info
+                    )
+                    live.update(render_group)
+                    if finish_reason != "tool_calls":
+                        message = {"role": "assistant", "content": current_answer}
+                        self._messages.append(message)
+                        return False
+
                 if hasattr(delta, "reasoning_content"):
                     current_thought += delta.reasoning_content
-                    render_group = self._get_render_group(current_thought, current_answer, tool_calls)
+                    render_group = self._get_render_group(
+                        current_thought, current_answer, tool_calls, usage_info
+                    )
                     live.update(render_group)
                 elif delta.tool_calls is not None:
                     status.stop()
@@ -102,12 +132,16 @@ class MiniAgent:
                     }
                     self._messages.append(message)
                     for tool in delta.tool_calls:
-                        with console.status(f"Using {tool.function.name}", spinner="dots3"):
+                        with console.status(
+                            f"Using {tool.function.name}", spinner="dots3"
+                        ):
                             start = time.perf_counter()
                             result = self.tool_set.call_tool(
                                 tool.function.name, tool.function.arguments
                             )
-                        tool_calls.append(f"Used {tool.function.name}({tool.function.arguments}) elapsed: {time.perf_counter()-start:.2f}")
+                        tool_calls.append(
+                            f"Used {tool.function.name} Time: {time.perf_counter()-start:.2f}"
+                        )
                         if result.is_error:
                             console.print(f"Tool Call Failed: {result.output}")
                         self._messages.append(
@@ -119,37 +153,27 @@ class MiniAgent:
                         )
                 else:
                     current_answer += delta.content
-                    render_group = self._get_render_group(current_thought, current_answer, tool_calls)
+                    render_group = self._get_render_group(
+                        current_thought, current_answer, tool_calls, usage_info
+                    )
                     live.update(render_group, refresh=True)
-        if current_answer.strip() and tool_calls == []:
-            status.stop()
-            message = {"role": "assistant", "content": current_answer}
-            self._messages.append(message)
-            return False
 
         return True
-    
-    def _get_render_group(self, current_thought, current_answer, tool_calls):
+
+    def _get_render_group(
+        self, current_thought, current_answer, tool_calls, usage_info
+    ):
+        rules = []
         if tool_calls:
             rules = [Rule(i, style="dim") for i in tool_calls]
-            return Group(
-                # 思考内容已经完成，保持浅色显示
-                Panel(
-                    current_thought,
-                    title="[italic]思考内容[/italic]",
-                    style="dim",
-                    border_style="grey23",
-                ),
-                *rules,
-                Markdown(current_answer),
-            )
         return Group(
-            # 思考内容已经完成，保持浅色显示
             Panel(
                 current_thought,
                 title="[italic]思考内容[/italic]",
                 style="dim",
                 border_style="grey23",
             ),
+            *rules,
             Markdown(current_answer),
+            usage_info or "",
         )
