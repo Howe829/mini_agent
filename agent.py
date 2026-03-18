@@ -58,9 +58,9 @@ class MiniAgent:
             except KeyboardInterrupt:
                 console.print("Bye", new_line_start=True)
                 break
-            except Exception as e:
-                console.print(f"Error Occured: {e}", new_line_start=True)
-                break
+            # except Exception as e:
+            #     console.print(f"Error Occured: {e}", new_line_start=True)
+            #     break
 
     def _call_llm_sync(self):
         with console.status(f"Thinking...", spinner="line"):
@@ -95,29 +95,30 @@ class MiniAgent:
                 if finish_reason is not None:
                     status.stop()
                     usage = event.usage
-                    usage_info = Columns(
-                        [
-                            Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
-                            Text.from_markup(
-                                f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
-                            ),
-                            Text.from_markup(
-                                f"[dim]Time:[/] [green]{time.time()-event.created:.2f}s[/]"
-                            ),
-                        ],
-                        equal=False,
-                        expand=False,
-                    )
-                    render_group = self._get_render_group(
-                        current_thought, current_answer, tool_calls, usage_info
-                    )
-                    live.update(render_group)
+                    if usage is not None:
+                        usage_info = Columns(
+                            [
+                                Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
+                                Text.from_markup(
+                                    f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
+                                ),
+                                Text.from_markup(
+                                    f"[dim]Time:[/] [green]{time.time()-event.created:.2f}s[/]"
+                                ),
+                            ],
+                            equal=False,
+                            expand=False,
+                        )
+                        render_group = self._get_render_group(
+                            current_thought, current_answer, tool_calls, usage_info
+                        )
+                        live.update(render_group)
                     if finish_reason != "tool_calls":
                         message = {"role": "assistant", "content": current_answer}
                         self._messages.append(message)
                         return False
 
-                if hasattr(delta, "reasoning_content"):
+                if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
                     current_thought += delta.reasoning_content
                     render_group = self._get_render_group(
                         current_thought, current_answer, tool_calls, usage_info
