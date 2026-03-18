@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
+from pydantic import BaseModel, Field
 
 
 class ThinkingConfig(BaseModel):
@@ -128,13 +128,13 @@ if __name__ == "__main__":
         provider = config.get_provider(provider_id)
         if provider is None:
             continue
-        print(f"\n📦 Provider: {provider_id}")
-        print(f"   Name: {provider.name}")
+        print("\n📦 Provider: {provider_id}")
+        print("   Name: {provider.name}")
         if provider.options:
             print(f"   Base URL: {provider.options.base_url}")
             print(f"   API Key: {'*' * 10 if provider.options.api_key else 'Not set'}")
 
-        print(f"   Available models:")
+        print("   Available models:")
         for model_id in config.list_models(provider_id):
             model = config.get_model(provider_id, model_id)
             if model is None:
@@ -144,5 +144,5 @@ if __name__ == "__main__":
                 print(
                     f"        Thinking: {model.options.thinking.type} ({model.options.thinking.budget_tokens} tokens)"
                 )
-    print(f"  Current:")
+    print("  Current:")
     print(config.current)

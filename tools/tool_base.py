@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Type, Optional
 from abc import ABC, abstractmethod
+from openai.types.chat import ChatCompletionFunctionToolParam
 
 _DEFAULT_TOOL_OUTPUT_MAX_LEN = 5000
 
@@ -30,7 +31,7 @@ class ToolBase(ABC):
     alias: Optional[str]
     params_class: Type[BaseModel]
 
-    def to_schema(self):
+    def to_schema(self) -> ChatCompletionFunctionToolParam:
         parameters = self.params_class.model_json_schema()
 
         if "properties" in parameters:
@@ -58,7 +59,7 @@ class ToolBase(ABC):
 class ToolSet:
     _tools: dict[str, ToolBase]
 
-    def __init__(self, tools: list[ToolBase] = None):
+    def __init__(self, tools: list[ToolBase] | None = None):
         self._tools = dict()
 
         if tools is None:

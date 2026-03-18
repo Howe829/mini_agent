@@ -1,6 +1,8 @@
 import time
 import json
+from typing import Any, cast
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from rich.console import Console, Group
 from rich.markdown import Markdown
 from prompt_toolkit import PromptSession
@@ -20,15 +22,19 @@ console = Console()
 
 
 class MiniAgent:
-    def __init__(self, tool_set: ToolSet = None):
+    def __init__(self, tool_set: ToolSet | None = None):
         config: MiniAgentConfig = load_config()
         provider = config.get_provider(config.current.provider)
+        if provider is None:
+            raise Exception("Config error, provider config cannot be none")
         openai_client = OpenAI(
             base_url=provider.options.base_url, api_key=provider.options.api_key
         )
         self._model = config.current.model
         self._prompt = self._load_prompt()
-        self._messages = [{"role": "system", "content": self._prompt}]
+        self._messages: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": self._prompt}
+        ]
         self.tool_set = tool_set if tool_set is not None else ToolSet()
         self._client = OpenAiLike(openai_client, tools=self.tool_set.to_schemas())
 
@@ -63,22 +69,6 @@ class MiniAgent:
             #     console.print(f"Error Occured: {e}", new_line_start=True)
             #     break
 
-    def _call_llm_sync(self):
-        with console.status(f"Thinking...", spinner="line"):
-            message = self._client.chat(
-                model=self._model,
-                messages=self._messages,
-            )
-        self._messages.append(message)
-        if message.tool_calls:
-            self.tool_set.call(message.tool_calls.func)
-            return True
-        else:
-            content = Markdown(message.content)
-            console.print("● ", end="", new_line_start=True)
-            console.print(content)
-            return False
-
     def _is_json_structured(self, _str):
         try:
             result = json.loads(_str)
@@ -106,7 +96,9 @@ class MiniAgent:
                     if usage is not None:
                         usage_info = Columns(
                             [
-                                Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
+                                Text.from_markup(
+                                    f"[dim]Model:[/] [cyan]{event.model}[/]"
+                                ),
                                 Text.from_markup(
                                     f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
                                 ),
@@ -122,12 +114,16 @@ class MiniAgent:
                         )
                         live.update(render_group)
                     if finish_reason != "tool_calls":
-                        message = {"role": "assistant", "content": current_answer}
+                        message = cast(
+                            ChatCompletionMessageParam,
+                            {"role": "assistant", "content": current_answer},
+                        )
                         self._messages.append(message)
                         return False
 
-                if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
-                    current_thought += delta.reasoning_content
+                reasoning = getattr(delta, "reasoning_content", None)
+                if reasoning:
+                    current_thought += reasoning
                     render_group = self._get_render_group(
                         current_thought, current_answer, tool_call_infos, usage_info
                     )
@@ -139,7 +135,7 @@ class MiniAgent:
                         "content": current_thought,
                         "tool_calls": delta.tool_calls,
                     }
-                    self._messages.append(message)
+                    self._messages.append(cast(ChatCompletionMessageParam, message))
                     final_tool_calls = {}
                     for tool_call_ in delta.tool_calls:
                         index = tool_call_.index
@@ -147,7 +143,10 @@ class MiniAgent:
                             final_tool_calls[index] = tool_call_
                         arguments = final_tool_calls[index].function.arguments
 
-                        if self._is_json_structured(arguments):
+                        if (
+                            self._is_json_structured(arguments)
+                            or tool_call_.function is None
+                        ):
                             continue
 
                         arguments += tool_call_.function.arguments
@@ -184,7 +183,7 @@ class MiniAgent:
                             }
                         )
                 else:
-                    current_answer += delta.content
+                    current_answer += delta.content or ""
                     render_group = self._get_render_group(
                         current_thought, current_answer, tool_call_infos, usage_info
                     )
