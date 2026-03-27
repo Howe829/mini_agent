@@ -9,4 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-*.json
+*.json-e 
+# Exports
+exports/
