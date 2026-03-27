@@ -1,10 +1,11 @@
 from agent import MiniAgent
+from tools.edge_tts import EdgeTtsTool
 from tools.shell import ExecuteShellTool
 from tools.tool_base import ToolSet
 
 
 def run_mini_agent():
-    tool_set = ToolSet(tools=[ExecuteShellTool()])
+    tool_set = ToolSet(tools=[ExecuteShellTool(), EdgeTtsTool()])
     mini_agent = MiniAgent(tool_set=tool_set)
     mini_agent.run()
 
