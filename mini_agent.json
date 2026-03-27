@@ -1,0 +1,32 @@
+{
+    "provider":{
+        "InternLM":{
+            "name": "InternLM",
+            "options":{
+                "apiKey": "sk-IbfSeqUrbWs1PaJnQXLgtBgO0X1xOvpCmj7U0ZkVHlps49R9",
+                "baseURL": "https://chat.intern-ai.org.cn/api/v1"
+            },
+            "models":{
+                "intern-latest": {
+                    "name": "Intern-Latest"
+                }
+            }
+        },
+        "GLM": {
+            "name": "GLM",
+            "options": {
+                "apiKey": "e825c1c245d941f08a68745fa01b67ae.1isTOfNbjl9Jhphf",
+                "baseURL": "https://open.bigmodel.cn/api/coding/paas/v4/"
+            },
+            "models": {
+                "GLM-5.1": {
+                    "name": "GLM-5.1"
+                }
+            }
+        }
+   },
+    "current": {
+        "provider": "GLM",
+        "model": "GLM-5.1"
+    }
+}

@@ -1,11 +1,10 @@
+import asyncio
 import time
 import json
 import re
 import subprocess
 import unicodedata
-from datetime import datetime
-from pathlib import Path
-from typing import Any, cast
+from typing import cast
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from rich.console import Console, Group
@@ -25,7 +24,14 @@ from rich.columns import Columns
 from rich.text import Text
 
 console = Console()
-TTS_PLAYBACK_OUTPUT_DIR = Path("exports/agent_reply_audio")
+MPV_TTS_ARGS = [
+    "mpv",
+    "--really-quiet",
+    "--cache=yes",
+    "--cache-secs=20",
+    "--demuxer-max-bytes=8MiB",
+    "-",
+]
 
 
 class MiniAgent:
@@ -206,36 +212,50 @@ class MiniAgent:
         if not cleaned_answer:
             return
 
-        output_path = self._build_tts_output_path()
-        tts_tool = EdgeTtsTool()
-        result = tts_tool(
-            EdgeTtsToolParams(
-                text=cleaned_answer,
-                output_path=str(output_path),
-            )
-        )
-        if result.is_error:
-            console.print(f"[yellow]TTS failed:[/] {result.output}")
-            return
-
         try:
-            subprocess.run(
-                ["mpv", "--really-quiet", str(output_path)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            asyncio.run(self._stream_tts_to_mpv(cleaned_answer))
         except FileNotFoundError:
             console.print("[yellow]mpv not found, skipped audio playback.[/]")
         except subprocess.CalledProcessError as exc:
             error_output = exc.stderr.strip() or exc.stdout.strip() or str(exc)
             console.print(f"[yellow]mpv playback failed:[/] {error_output}")
+        except Exception as exc:
+            console.print(f"[yellow]TTS failed:[/] {exc}")
 
-    @staticmethod
-    def _build_tts_output_path() -> Path:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        TTS_PLAYBACK_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        return TTS_PLAYBACK_OUTPUT_DIR / f"reply_{timestamp}.mp3"
+    async def _stream_tts_to_mpv(self, answer: str):
+        process = subprocess.Popen(
+            MPV_TTS_ARGS,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        if process.stdin is None:
+            process.kill()
+            raise RuntimeError("mpv stdin is not available")
+
+        try:
+            async for chunk in self._iter_tts_audio_chunks(answer):
+                process.stdin.write(chunk) # type: ignore
+                process.stdin.flush()
+        finally:
+            process.stdin.close()
+
+        return_code = process.wait()
+        if return_code != 0:
+            stderr = process.stderr.read().decode("utf-8", errors="ignore") # type: ignore
+            stdout = process.stdout.read().decode("utf-8", errors="ignore") # type: ignore
+            raise subprocess.CalledProcessError(
+                return_code, MPV_TTS_ARGS, output=stdout, stderr=stderr
+            )
+
+    async def _iter_tts_audio_chunks(self, answer: str):
+        communicate = EdgeTtsTool._build_communicate(
+            EdgeTtsToolParams(text=answer, output_path=None)
+        )
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                yield chunk.get("data")
 
     @staticmethod
     def _clean_tts_text(text: str) -> str:
