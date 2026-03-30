@@ -1,4 +1,4 @@
-from agent import MiniAgent
+from src.mini_agent import MiniAgent
 
 
 def test_speak_answer_generates_audio_and_plays(monkeypatch):

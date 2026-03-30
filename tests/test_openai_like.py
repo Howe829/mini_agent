@@ -5,10 +5,10 @@ from typing import cast
 from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionMessageParam
 
-from llm.openai import OpenAiLike, AsyncOpenAiLike
-from tools.weather_tool import WeatherTool
-from tools.ask_user_tool import AskUserTool
-from tools.shell import ExecuteShellTool
+from src.llm.openai import OpenAiLike, AsyncOpenAiLike
+from src.tools.weather_tool import WeatherTool
+from src.tools.ask_user_tool import AskUserTool
+from src.tools.shell import ExecuteShellTool
 from config import load_config
 
 
