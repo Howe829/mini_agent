@@ -12,3 +12,5 @@ wheels/
 *.json-e 
 # Exports
 exports/
+
+mini_agent.json
