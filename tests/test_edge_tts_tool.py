@@ -20,13 +20,17 @@ def test_edge_tts_tool_writes_audio_file(tmp_path, monkeypatch):
         async def save(self, output_path):
             Path(output_path).write_bytes(b"fake-mp3")
 
-    monkeypatch.setattr(EdgeTtsTool, "_build_communicate", lambda params: FakeCommunicate(
-        text=params.text,
-        voice=params.voice,
-        rate=params.rate,
-        volume=params.volume,
-        pitch=params.pitch,
-    ))
+    monkeypatch.setattr(
+        EdgeTtsTool,
+        "_build_communicate",
+        lambda params: FakeCommunicate(
+            text=params.text,
+            voice=params.voice,
+            rate=params.rate,
+            volume=params.volume,
+            pitch=params.pitch,
+        ),
+    )
 
     tool = EdgeTtsTool()
     output_path = tmp_path / "hello.mp3"

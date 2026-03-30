@@ -24,7 +24,9 @@ def test_speak_answer_cleans_markdown_and_emoji(monkeypatch):
 
     monkeypatch.setattr(MiniAgent, "_stream_tts_to_mpv", fake_stream)
 
-    agent._speak_answer("# 标题\n- **第一条** 😀\n- 第二条 [链接](https://example.com)\n")
+    agent._speak_answer(
+        "# 标题\n- **第一条** 😀\n- 第二条 [链接](https://example.com)\n"
+    )
 
     assert calls["text"] == "标题\n第一条\n第二条 链接"
 

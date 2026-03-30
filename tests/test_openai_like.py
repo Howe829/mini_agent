@@ -109,7 +109,7 @@ def test_openai_like_stream_chat(openai_client, current_model):
     for _ in generator:
         pass
         # print(event)
-    print(f"Sync Elapsed: {time.perf_counter()-start:.2f}s")
+    print(f"Sync Elapsed: {time.perf_counter() - start:.2f}s")
 
 
 @pytest.mark.asyncio
@@ -126,4 +126,4 @@ async def test_openai_like_stream_chat_async(async_openai_client, current_model)
     async for _ in generator:
         pass
         # print(event)
-    print(f"ASync Elapsed: {time.perf_counter()-start:.2f}s")
+    print(f"ASync Elapsed: {time.perf_counter() - start:.2f}s")

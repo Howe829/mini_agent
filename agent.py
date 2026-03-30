@@ -94,9 +94,7 @@ class MiniAgent:
         live.start()
         status = console.status(f"Thinking...", spinner="line")
         status.start()
-        generator = self._client.stream_chat(
-            messages=self._messages, model=self._model
-        )
+        generator = self._client.stream_chat(messages=self._messages, model=self._model)
         current_thought = ""
         current_answer = ""
         tool_call_infos = []
@@ -110,14 +108,12 @@ class MiniAgent:
                 if usage is not None:
                     usage_info = Columns(
                         [
-                            Text.from_markup(
-                                f"[dim]Model:[/] [cyan]{event.model}[/]"
-                            ),
+                            Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
                             Text.from_markup(
                                 f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
                             ),
                             Text.from_markup(
-                                f"[dim]Time:[/] [green]{time.time()-event.created:.2f}s[/]"
+                                f"[dim]Time:[/] [green]{time.time() - event.created:.2f}s[/]"
                             ),
                         ],
                         equal=False,
@@ -182,7 +178,7 @@ class MiniAgent:
                                     f"[dim]Used: {tool_call.function.name}"
                                 ),
                                 Text.from_markup(
-                                    f"[dim]Time: {time.perf_counter()-start:.2f}s"
+                                    f"[dim]Time: {time.perf_counter() - start:.2f}s"
                                 ),
                             ],
                             equal=False,
@@ -236,15 +232,15 @@ class MiniAgent:
 
         try:
             async for chunk in self._iter_tts_audio_chunks(answer):
-                process.stdin.write(chunk) # type: ignore
+                process.stdin.write(chunk)  # type: ignore
                 process.stdin.flush()
         finally:
             process.stdin.close()
 
         return_code = process.wait()
         if return_code != 0:
-            stderr = process.stderr.read().decode("utf-8", errors="ignore") # type: ignore
-            stdout = process.stdout.read().decode("utf-8", errors="ignore") # type: ignore
+            stderr = process.stderr.read().decode("utf-8", errors="ignore")  # type: ignore
+            stdout = process.stdout.read().decode("utf-8", errors="ignore")  # type: ignore
             raise subprocess.CalledProcessError(
                 return_code, MPV_TTS_ARGS, output=stdout, stderr=stderr
             )
