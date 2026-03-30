@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 from pydantic import BaseModel, Field, field_validator
 from typing import Type, Optional
 from abc import ABC, abstractmethod
@@ -49,7 +51,19 @@ class ToolBase(ABC):
 
     def call(self, func_args: str) -> ToolReturnValue:
         parameters = self.params_class.model_validate_json(func_args)
+        if inspect.iscoroutinefunction(self.__call__):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(self.__call__(parameters))
+            raise RuntimeError("Async tool cannot be called from sync context with a running event loop")
         return self.__call__(parameters)
+
+    async def call_async(self, func_args: str) -> ToolReturnValue:
+        parameters = self.params_class.model_validate_json(func_args)
+        if inspect.iscoroutinefunction(self.__call__):
+            return await self.__call__(parameters)
+        return await asyncio.to_thread(self.__call__, parameters)
 
     @abstractmethod
     def __call__(self, *args, **kwds) -> ToolReturnValue:
@@ -79,6 +93,13 @@ class ToolSet:
                 output=f"Tool ({tool_name}) not exists.", is_error=True
             )
         return self._tools[tool_name].call(func_args)
+
+    async def call_tool_async(self, tool_name: str, func_args: str) -> ToolReturnValue:
+        if tool_name not in self._tools.keys():
+            return ToolReturnValue(
+                output=f"Tool ({tool_name}) not exists.", is_error=True
+            )
+        return await self._tools[tool_name].call_async(func_args)
 
     def to_schemas(self):
         return [tool.to_schema() for tool in self._tools.values()]

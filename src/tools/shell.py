@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 from pydantic import BaseModel, Field
 from typing import Type, override, Optional
@@ -18,20 +19,23 @@ class ExecuteShellTool(ToolBase):
     params_class: Type[BaseModel] = ExecuteShellToolParams
 
     @override
-    def __call__(self, params: ExecuteShellToolParams) -> ToolReturnValue:
+    async def __call__(self, params: ExecuteShellToolParams) -> ToolReturnValue:
         try:
-            result = subprocess.run(
+            process = await asyncio.create_subprocess_shell(
                 params.command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=SHELL_EXECUTE_TIMEOUT,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            std_content = result.stdout + result.stderr
-            if result.returncode != 0:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=SHELL_EXECUTE_TIMEOUT
+            )
+            std_content = stdout.decode() + stderr.decode()
+            if process.returncode != 0:
                 return ToolReturnValue(output=std_content, is_error=True)
             return ToolReturnValue(output=std_content, is_error=False)
-        except subprocess.TimeoutExpired:
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
             return ToolReturnValue(
                 output=f"执行命令：{params.command} 超时({SHELL_EXECUTE_TIMEOUT}s)",
                 is_error=True,

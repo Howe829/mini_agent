@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Type, override
@@ -31,7 +30,7 @@ class EdgeTtsTool(ToolBase):
     params_class: Type[BaseModel] = EdgeTtsToolParams
 
     @override
-    def __call__(self, params: EdgeTtsToolParams) -> ToolReturnValue:
+    async def __call__(self, params: EdgeTtsToolParams) -> ToolReturnValue:
         if not params.text.strip():
             return ToolReturnValue(output="文本内容不能为空", is_error=True)
 
@@ -39,7 +38,7 @@ class EdgeTtsTool(ToolBase):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            asyncio.run(self._save_audio(params, output_path))
+            await self._save_audio(params, output_path)
         except Exception as exc:
             return ToolReturnValue(output=f"edge-tts 合成失败: {exc}", is_error=True)
 

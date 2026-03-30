@@ -35,7 +35,7 @@ class CLIAgent:
         self._mini_agent = MiniAgent(tool_set=tool_set)
     
 
-    def run(self):
+    async def run(self):
         self._console.print("Welcome to Mini Agent!")
         self._console.print("--------------------------------------------")
         history = InMemoryHistory()
@@ -43,32 +43,33 @@ class CLIAgent:
 
         while True:
             try:
-                user_input = session.prompt("➜ ")
+                user_input = await session.prompt_async("➜ ")
                 if user_input.lower() == "exit":
                     self._console.print("Bye")
                     break
 
                 # Keep a static transcript line for each turn.
-                self._console.print(Text("You: ", style="cyan") + Text(user_input))
                 user_message = {"role": "user", "content": user_input}
                 self._mini_agent.add_message(user_message)
-                live = Live(Markdown(""), console=self._console, refresh_per_second=10, transient=True)
+                live = Live(
+                    Markdown(""),
+                    console=self._console,
+                    refresh_per_second=10,
+                )
                 live.start()
                 try:
                     while True:
+                        agent_state = AgentState()
                         self._status.start()
                         try:
-                            agent_state = self._mini_agent.run()
+                            async for stream_state in self._mini_agent.run_stream():
+                                agent_state = stream_state
+                                self._update_live(agent_state, live)
                         finally:
                             self._status.stop()
 
-                        self._update_live(agent_state, live)
                         if agent_state.is_finish is True:
-                            self._console.print(
-                                Text("Assistant: ", style="green")
-                                + Text(agent_state.current_answer)
-                            )
-                            self._speak_answer(agent_state.current_answer)
+                            await self._speak_answer(agent_state.current_answer)
                             break
                 finally:
                     live.stop()
@@ -143,13 +144,13 @@ class CLIAgent:
         )
         live.update(group)
 
-    def _speak_answer(self, answer: str):
+    async def _speak_answer(self, answer: str):
         cleaned_answer = self._clean_tts_text(answer)
         if not cleaned_answer:
             return
 
         try:
-            asyncio.run(self._stream_tts_to_mpv(cleaned_answer))
+            await self._stream_tts_to_mpv(cleaned_answer)
         except FileNotFoundError:
             self._console.print("[yellow]mpv not found, skipped audio playback.[/]")
         except subprocess.CalledProcessError as exc:
@@ -159,30 +160,37 @@ class CLIAgent:
             self._console.print(f"[yellow]TTS failed:[/] {exc}")
 
     async def _stream_tts_to_mpv(self, answer: str):
-        process = subprocess.Popen(
-            MPV_TTS_ARGS,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        process = await asyncio.create_subprocess_exec(
+            *MPV_TTS_ARGS,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
 
         if process.stdin is None:
             process.kill()
+            await process.wait()
             raise RuntimeError("mpv stdin is not available")
 
         try:
             async for chunk in self._iter_tts_audio_chunks(answer):
-                process.stdin.write(chunk)  # type: ignore
-                process.stdin.flush()
+                if chunk is None:
+                    continue
+                process.stdin.write(chunk)
+                await process.stdin.drain()
         finally:
             process.stdin.close()
+            await process.stdin.wait_closed()
 
-        return_code = process.wait()
+        return_code = await process.wait()
         if return_code != 0:
-            stderr = process.stderr.read().decode("utf-8", errors="ignore")  # type: ignore
-            stdout = process.stdout.read().decode("utf-8", errors="ignore")  # type: ignore
+            stderr = await process.stderr.read() if process.stderr is not None else b""
+            stdout = await process.stdout.read() if process.stdout is not None else b""
             raise subprocess.CalledProcessError(
-                return_code, MPV_TTS_ARGS, output=stdout, stderr=stderr
+                return_code,
+                MPV_TTS_ARGS,
+                output=stdout.decode("utf-8", errors="ignore"),
+                stderr=stderr.decode("utf-8", errors="ignore"),
             )
 
     async def _iter_tts_audio_chunks(self, answer: str):
