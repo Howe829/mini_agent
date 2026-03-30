@@ -26,6 +26,9 @@ MPV_TTS_ARGS = [
     "-",
 ]
 
+MIN_LIVE_BODY_LINES = 6
+TOOL_ERROR_PREVIEW_LINES = 3
+
 class CLIAgent:
     
     def __init__(self):
@@ -48,13 +51,15 @@ class CLIAgent:
                     self._console.print("Bye")
                     break
 
-                # Keep a static transcript line for each turn.
+                self._console.print(Text("You: ", style="cyan") + Text(user_input))
                 user_message = {"role": "user", "content": user_input}
                 self._mini_agent.add_message(user_message)
                 live = Live(
                     Markdown(""),
                     console=self._console,
                     refresh_per_second=10,
+                    transient=True,
+                    vertical_overflow="crop",
                 )
                 live.start()
                 try:
@@ -69,6 +74,10 @@ class CLIAgent:
                             self._status.stop()
 
                         if agent_state.is_finish is True:
+                            self._console.print(
+                                Text("Assistant: ", style="green")
+                                + Text(agent_state.current_answer)
+                            )
                             await self._speak_answer(agent_state.current_answer)
                             break
                 finally:
@@ -102,6 +111,26 @@ class CLIAgent:
             expand=False,
         )
         return usage_info_columns
+
+    def _get_live_line_budget(self, tool_call_infos: list[ToolCallInfo]) -> tuple[int, int]:
+        terminal_height = self._console.size.height or 24
+        reserved_lines = 8 + len(tool_call_infos) * 2
+        body_lines = max(MIN_LIVE_BODY_LINES, terminal_height - reserved_lines)
+        thought_lines = max(2, body_lines // 3)
+        answer_lines = max(4, body_lines - thought_lines)
+        return thought_lines, answer_lines
+
+    @staticmethod
+    def _tail_lines(text: str, max_lines: int) -> str:
+        if max_lines <= 0 or not text.strip():
+            return ""
+
+        lines = text.splitlines()
+        if len(lines) <= max_lines:
+            return text.strip()
+
+        tail = "\n".join(lines[-max_lines:])
+        return f"...\n{tail}".strip()
     
     def _get_tool_call_info_columns(self, tool_call_infos: list[ToolCallInfo]) -> list[Columns]:
         tool_call_info_columns = []
@@ -115,9 +144,13 @@ class CLIAgent:
                         ),
             ]
             if tool_call_info.is_error:
+                error_preview = self._tail_lines(
+                    tool_call_info.error_message or "",
+                    TOOL_ERROR_PREVIEW_LINES,
+                )
                 columns.append(
                     Text.from_markup(
-                        f"[dim]ToolCallError: {tool_call_info.error_message[:50]}"
+                        f"[dim]ToolCallError: {error_preview[:120]}"
                     ),
                     
                 )
@@ -131,15 +164,20 @@ class CLIAgent:
         return tool_call_info_columns
 
     def _update_live(self, agent_state: AgentState, live: Live):
+        thought_lines, answer_lines = self._get_live_line_budget(
+            agent_state.tool_call_infos
+        )
+        thought_preview = self._tail_lines(agent_state.current_thought, thought_lines)
+        answer_preview = self._tail_lines(agent_state.current_answer, answer_lines)
         tool_call_info_columns = self._get_tool_call_info_columns(agent_state.tool_call_infos)
         usage_info_columns = self._get_usage_info_columns(agent_state.usage_info) if agent_state.usage_info is not None else ""
         group = Group(
             Markdown(
-                agent_state.current_thought,
+                thought_preview,
                 style="dim",
             ),
             *tool_call_info_columns,
-            Markdown(agent_state.current_answer),
+            Markdown(answer_preview),
             usage_info_columns,
         )
         live.update(group)
