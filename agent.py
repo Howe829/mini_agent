@@ -7,6 +7,7 @@ import unicodedata
 from typing import cast
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from rich.console import Console, Group
 from rich.markdown import Markdown
 from prompt_toolkit import PromptSession
@@ -17,7 +18,6 @@ from tools.edge_tts import EdgeTtsTool, EdgeTtsToolParams
 from tools.tool_base import ToolSet
 from llm.openai import OpenAiLike
 from rich.live import Live
-from rich.panel import Panel
 from rich.columns import Columns
 from rich.text import Text
 
@@ -93,7 +93,8 @@ class MiniAgent:
             message
         )
         self._messages.append(message)
-    def _get_usage_info(self, event)-> Columns | None:
+        
+    def _collect_usage_info(self, event)-> Columns | None:
         usage = event.usage
         
         if usage is None:
@@ -113,6 +114,61 @@ class MiniAgent:
             expand=False,
         )
         return usage_info
+    
+    def _collect_tool_calls(self, delta: ChoiceDelta):
+        final_tool_calls = {}
+        for tool_call_ in delta.tool_calls:
+            
+            if tool_call_.function is None:
+                continue
+            
+            index = tool_call_.index
+            if index not in final_tool_calls:
+                final_tool_calls[index] = tool_call_
+            arguments = final_tool_calls[index].function.arguments
+
+            if self._is_json_structured(arguments):
+                continue
+
+            final_tool_calls[index].function.arguments += tool_call_.function.arguments
+        return final_tool_calls
+    
+    def _handle_tool_calls(self, delta: ChoiceDelta) -> list[Columns]:
+        final_tool_calls = self._collect_tool_calls(delta)
+        tool_call_infos = []
+        for tool_call in final_tool_calls.values():
+            with console.status(
+                f"Using {tool_call.function.name}", spinner="dots3"
+            ):
+                start = time.perf_counter()
+                result = self.tool_set.call_tool(
+                    tool_call.function.name, tool_call.function.arguments
+                )
+            tool_call_infos.append(
+                Columns(
+                    [
+                        Text.from_markup(
+                            f"[dim]Used: {tool_call.function.name}"
+                        ),
+                        Text.from_markup(
+                            f"[dim]Time: {time.perf_counter() - start:.2f}s"
+                        ),
+                    ],
+                    equal=False,
+                    expand=False,
+                )
+            )
+            if result.is_error:
+                console.print(f"Tool Call Failed: {result.output}")
+            self._add_message(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result.output,
+                }
+            )
+        return tool_call_infos
+        
         
     def _call_llm_stream(self):
         live = Live(Markdown(""), console=console, refresh_per_second=10)
@@ -120,16 +176,18 @@ class MiniAgent:
         status = console.status(f"Thinking...", spinner="line")
         status.start()
         generator = self._client.stream_chat(messages=self._messages, model=self._model)
+
         current_thought = ""
         current_answer = ""
         tool_call_infos = []
         usage_info = None
+
         for event in generator:
             delta = event.choices[0].delta
             finish_reason = event.choices[0].finish_reason
             if finish_reason is not None:
                 status.stop()
-                usage_info = self._get_usage_info(event)
+                usage_info = self._collect_usage_info(event)
                 if usage_info is not None:
                     render_group = self._get_render_group(
                         current_thought, current_answer, tool_call_infos, usage_info
@@ -143,7 +201,8 @@ class MiniAgent:
                     return False
 
             reasoning = getattr(delta, "reasoning_content", None)
-            if reasoning:
+
+            if reasoning is not None:
                 current_thought += reasoning
                 render_group = self._get_render_group(
                     current_thought, current_answer, tool_call_infos, usage_info
@@ -157,52 +216,7 @@ class MiniAgent:
                     "tool_calls": delta.tool_calls,
                 }
                 self._add_message(message)
-                final_tool_calls = {}
-                for tool_call_ in delta.tool_calls:
-                    index = tool_call_.index
-                    if index not in final_tool_calls:
-                        final_tool_calls[index] = tool_call_
-                    arguments = final_tool_calls[index].function.arguments
-
-                    if (
-                        self._is_json_structured(arguments)
-                        or tool_call_.function is None
-                    ):
-                        continue
-
-                    arguments += tool_call_.function.arguments
-
-                for tool_call in final_tool_calls.values():
-                    with console.status(
-                        f"Using {tool_call.function.name}", spinner="dots3"
-                    ):
-                        start = time.perf_counter()
-                        result = self.tool_set.call_tool(
-                            tool_call.function.name, tool_call.function.arguments
-                        )
-                    tool_call_infos.append(
-                        Columns(
-                            [
-                                Text.from_markup(
-                                    f"[dim]Used: {tool_call.function.name}"
-                                ),
-                                Text.from_markup(
-                                    f"[dim]Time: {time.perf_counter() - start:.2f}s"
-                                ),
-                            ],
-                            equal=False,
-                            expand=False,
-                        )
-                    )
-                    if result.is_error:
-                        console.print(f"Tool Call Failed: {result.output}")
-                    self._add_message(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": result.output,
-                        }
-                    )
+                tool_call_infos = self._handle_tool_calls(delta)
             else:
                 current_answer += delta.content or ""
                 render_group = self._get_render_group(
@@ -290,11 +304,9 @@ class MiniAgent:
         self, current_thought, current_answer, tool_call_infos, usage_info
     ):
         return Group(
-            Panel(
+            Markdown(
                 current_thought,
-                title="[italic]思考内容[/italic]",
                 style="dim",
-                border_style="grey23",
             ),
             *tool_call_infos,
             Markdown(current_answer),
