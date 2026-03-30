@@ -1,6 +1,5 @@
 import time
 import json
-from typing import cast
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
@@ -41,7 +40,6 @@ class MiniAgent:
             return False
 
     def add_message(self, message: dict):
-        message = cast(ChatCompletionMessageParam, message)
         self._messages.append(message)
 
     def _collect_usage_info(self, event):

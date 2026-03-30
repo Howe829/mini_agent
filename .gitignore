@@ -13,4 +13,5 @@ wheels/
 # Exports
 exports/
 
+mini_agent.toml
 mini_agent.json

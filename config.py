@@ -1,5 +1,8 @@
 from typing import Dict, List, Optional
+import tomllib
 from pydantic import BaseModel, Field
+
+DEFAULT_CONFIG_FILE = "mini_agent.toml"
 
 
 class ThinkingConfig(BaseModel):
@@ -71,7 +74,7 @@ class CurrentChoice(BaseModel):
 
 
 class MiniAgentConfig(BaseModel):
-    """Root configuration for mini_agent.json"""
+    """Root configuration for mini_agent.toml"""
 
     provider: Dict[str, ProviderConfig] = Field(
         ..., description="Provider configurations"
@@ -79,12 +82,12 @@ class MiniAgentConfig(BaseModel):
     current: CurrentChoice
 
     @classmethod
-    def from_json_file(cls, file_path: str = "mini_agent.json") -> "MiniAgentConfig":
-        """Load configuration from JSON file"""
-        import json
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    def from_toml_file(
+        cls, file_path: str = DEFAULT_CONFIG_FILE
+    ) -> "MiniAgentConfig":
+        """Load configuration from TOML file"""
+        with open(file_path, "rb") as f:
+            data = tomllib.load(f)
         return cls(**data)
 
     def get_provider(self, provider_id: str) -> ProviderConfig | None:
@@ -111,9 +114,9 @@ class MiniAgentConfig(BaseModel):
 
 
 # Convenience function to load config
-def load_config(file_path: str = "mini_agent.json") -> MiniAgentConfig:
+def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> MiniAgentConfig:
     """Load and return the mini_agent configuration"""
-    return MiniAgentConfig.from_json_file(file_path)
+    return MiniAgentConfig.from_toml_file(file_path)
 
 
 if __name__ == "__main__":
