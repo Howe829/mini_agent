@@ -17,9 +17,7 @@ from tools.edge_tts import EdgeTtsTool, EdgeTtsToolParams
 from tools.tool_base import ToolSet
 from llm.openai import OpenAiLike
 from rich.live import Live
-from rich.style import Style
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.columns import Columns
 from rich.text import Text
 
@@ -82,13 +80,40 @@ class MiniAgent:
             #     console.print(f"Error Occured: {e}", new_line_start=True)
             #     break
 
-    def _is_json_structured(self, _str):
+    def _is_json_structured(self, _str: str):
         try:
             result = json.loads(_str)
             return isinstance(result, (dict, list))
         except (ValueError, TypeError):
             return False
-
+    
+    def _add_message(self, message: dict):
+        message = cast(
+            ChatCompletionMessageParam,
+            message
+        )
+        self._messages.append(message)
+    def _get_usage_info(self, event)-> Columns | None:
+        usage = event.usage
+        
+        if usage is None:
+            return None
+        
+        usage_info = Columns(
+            [
+                Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
+                Text.from_markup(
+                    f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
+                ),
+                Text.from_markup(
+                    f"[dim]Time:[/] [green]{time.time() - event.created:.2f}s[/]"
+                ),
+            ],
+            equal=False,
+            expand=False,
+        )
+        return usage_info
+        
     def _call_llm_stream(self):
         live = Live(Markdown(""), console=console, refresh_per_second=10)
         live.start()
@@ -104,31 +129,15 @@ class MiniAgent:
             finish_reason = event.choices[0].finish_reason
             if finish_reason is not None:
                 status.stop()
-                usage = event.usage
-                if usage is not None:
-                    usage_info = Columns(
-                        [
-                            Text.from_markup(f"[dim]Model:[/] [cyan]{event.model}[/]"),
-                            Text.from_markup(
-                                f"[dim]Tokens:[/] [yellow]{usage.total_tokens}[/]"
-                            ),
-                            Text.from_markup(
-                                f"[dim]Time:[/] [green]{time.time() - event.created:.2f}s[/]"
-                            ),
-                        ],
-                        equal=False,
-                        expand=False,
-                    )
+                usage_info = self._get_usage_info(event)
+                if usage_info is not None:
                     render_group = self._get_render_group(
                         current_thought, current_answer, tool_call_infos, usage_info
                     )
                     live.update(render_group)
+                    
                 if finish_reason != "tool_calls":
-                    message = cast(
-                        ChatCompletionMessageParam,
-                        {"role": "assistant", "content": current_answer},
-                    )
-                    self._messages.append(message)
+                    self._add_message({"role": "assistant", "content": current_answer})
                     live.stop()
                     self._speak_answer(current_answer)
                     return False
@@ -147,7 +156,7 @@ class MiniAgent:
                     "content": current_thought,
                     "tool_calls": delta.tool_calls,
                 }
-                self._messages.append(cast(ChatCompletionMessageParam, message))
+                self._add_message(message)
                 final_tool_calls = {}
                 for tool_call_ in delta.tool_calls:
                     index = tool_call_.index
@@ -187,7 +196,7 @@ class MiniAgent:
                     )
                     if result.is_error:
                         console.print(f"Tool Call Failed: {result.output}")
-                    self._messages.append(
+                    self._add_message(
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
@@ -200,6 +209,7 @@ class MiniAgent:
                     current_thought, current_answer, tool_call_infos, usage_info
                 )
                 live.update(render_group, refresh=True)
+                
         live.stop()
         return True
 
