@@ -11,7 +11,7 @@ from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.panel import Panel
 from prompt_toolkit import PromptSession
-from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.history import FileHistory
 from src.types.state import AgentState, ToolCallInfo, UsageInfo
 from src.tools.edge_tts import EdgeTtsTool
 from src.tools.edge_tts import EdgeTtsToolParams
@@ -31,6 +31,7 @@ MPV_TTS_ARGS = [
 DEFAULT_COLLAPSED_LINES = 18
 DEFAULT_THOUGHT_LINES = 6
 TOOL_ERROR_PREVIEW_LINES = 3
+HISTORY_FILE_PATH = Path.home() / ".mini_agent_history"
 
 
 class CLIAgent:
@@ -42,7 +43,8 @@ class CLIAgent:
 
     async def run(self):
         self._print_welcome()
-        history = InMemoryHistory()
+        HISTORY_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        history = FileHistory(str(HISTORY_FILE_PATH))
         session = PromptSession(history=history)
 
         while True:
