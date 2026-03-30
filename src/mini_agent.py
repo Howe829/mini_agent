@@ -20,7 +20,7 @@ class MiniAgent:
         openai_client = AsyncOpenAI(
             base_url=provider.options.base_url, api_key=provider.options.api_key
         )
-        self._model = config.current.model
+        self.model = config.current.model
         self._prompt = self._load_prompt()
         self._messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self._prompt}
@@ -118,7 +118,7 @@ class MiniAgent:
         final_tool_calls: dict = {}
 
         generator = await self._client.stream_chat(
-            messages=self._messages, model=self._model
+            messages=self._messages, model=self.model
         )
 
         async for event in generator:

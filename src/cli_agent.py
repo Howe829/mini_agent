@@ -2,11 +2,14 @@ import re
 import asyncio
 import subprocess
 import unicodedata
+from datetime import datetime
+from pathlib import Path
 from rich.live import Live
 from rich.columns import Columns
 from rich.text import Text
 from rich.console import Console, Group
 from rich.markdown import Markdown
+from rich.panel import Panel
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from src.types.state import AgentState, ToolCallInfo, UsageInfo
@@ -38,8 +41,7 @@ class CLIAgent:
         self._mini_agent = MiniAgent(tool_set=tool_set)
 
     async def run(self):
-        self._console.print("Welcome to Mini Agent!")
-        self._console.print("--------------------------------------------")
+        self._print_welcome()
         history = InMemoryHistory()
         session = PromptSession(history=history)
 
@@ -84,6 +86,30 @@ class CLIAgent:
                 self._console.print(f"Error Occured: {e}", new_line_start=True)
                 self._status.stop()
                 break
+
+    def _print_welcome(self):
+        now = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        current_dir = Path.cwd()
+        welcome_text = Text()
+        welcome_text.append("Mini Agent\n", style="bold cyan")
+        welcome_text.append("Async CLI session is ready.\n\n", style="dim")
+        welcome_text.append("Model: ", style="bold")
+        welcome_text.append(f"{self._mini_agent.model}\n", style="cyan")
+        welcome_text.append("Directory: ", style="bold")
+        welcome_text.append(f"{current_dir}\n", style="green")
+        welcome_text.append("Datetime: ", style="bold")
+        welcome_text.append(f"{now}\n", style="yellow")
+        welcome_text.append("Exit: ", style="bold")
+        welcome_text.append("type `exit` or press Ctrl+D", style="magenta")
+        self._console.print(
+            Panel(
+                welcome_text,
+                title="Welcome",
+                border_style="blue",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     def _get_usage_info_columns(self, usage_info: UsageInfo) -> list[Columns]:
         usage_info_columns = Columns(
