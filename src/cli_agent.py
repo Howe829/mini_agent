@@ -1,4 +1,3 @@
-
 import re
 import asyncio
 import subprocess
@@ -30,14 +29,13 @@ DEFAULT_COLLAPSED_LINES = 18
 DEFAULT_THOUGHT_LINES = 6
 TOOL_ERROR_PREVIEW_LINES = 3
 
+
 class CLIAgent:
-    
     def __init__(self):
         self._console = Console()
         self._status = self._console.status(f"Thinking...", spinner="line")
         tool_set = ToolSet(tools=[ExecuteShellTool(), EdgeTtsTool()])
         self._mini_agent = MiniAgent(tool_set=tool_set)
-    
 
     async def run(self):
         self._console.print("Welcome to Mini Agent!")
@@ -73,7 +71,7 @@ class CLIAgent:
                         if agent_state.is_finish is True:
                             await self._speak_answer(agent_state.current_answer)
                             break
-                
+
             except EOFError:
                 self._console.print("Bye", new_line_start=True)
                 self._status.stop()
@@ -86,7 +84,7 @@ class CLIAgent:
                 self._console.print(f"Error Occured: {e}", new_line_start=True)
                 self._status.stop()
                 break
-    
+
     def _get_usage_info_columns(self, usage_info: UsageInfo) -> list[Columns]:
         usage_info_columns = Columns(
             [
@@ -94,9 +92,7 @@ class CLIAgent:
                 Text.from_markup(
                     f"[dim]Tokens:[/] [yellow]{usage_info.total_tokens}[/]"
                 ),
-                Text.from_markup(
-                    f"[dim]Time:[/] [green]{usage_info.elapsed:.2f}s[/]"
-                ),
+                Text.from_markup(f"[dim]Time:[/] [green]{usage_info.elapsed:.2f}s[/]"),
             ],
             equal=False,
             expand=False,
@@ -116,16 +112,14 @@ class CLIAgent:
         hidden_count = len(lines) - max_lines
         return f"[{hidden_count} lines hidden]\n{tail}".strip()
 
-    def _get_tool_call_info_columns(self, tool_call_infos: list[ToolCallInfo]) -> list[Columns]:
+    def _get_tool_call_info_columns(
+        self, tool_call_infos: list[ToolCallInfo]
+    ) -> list[Columns]:
         tool_call_info_columns = []
         for tool_call_info in tool_call_infos:
             columns = [
-                        Text.from_markup(
-                            f"[dim]Used: {tool_call_info.function_name}"
-                        ),
-                        Text.from_markup(
-                            f"[dim]Time: {tool_call_info.elapsed:.2f}s"
-                        ),
+                Text.from_markup(f"[dim]Used: {tool_call_info.function_name}"),
+                Text.from_markup(f"[dim]Time: {tool_call_info.elapsed:.2f}s"),
             ]
             if tool_call_info.is_error:
                 error_preview = self._tail_lines(
@@ -133,10 +127,7 @@ class CLIAgent:
                     TOOL_ERROR_PREVIEW_LINES,
                 )
                 columns.append(
-                    Text.from_markup(
-                        f"[dim]ToolCallError: {error_preview}"
-                    ),
-                    
+                    Text.from_markup(f"[dim]ToolCallError: {error_preview}"),
                 )
             tool_call_info_columns.append(
                 Columns(
@@ -148,8 +139,14 @@ class CLIAgent:
         return tool_call_info_columns
 
     def _update_live(self, agent_state: AgentState, live: Live):
-        tool_call_info_columns = self._get_tool_call_info_columns(agent_state.tool_call_infos)
-        usage_info_columns = self._get_usage_info_columns(agent_state.usage_info) if agent_state.usage_info is not None else ""
+        tool_call_info_columns = self._get_tool_call_info_columns(
+            agent_state.tool_call_infos
+        )
+        usage_info_columns = (
+            self._get_usage_info_columns(agent_state.usage_info)
+            if agent_state.usage_info is not None
+            else ""
+        )
         thought_preview = self._tail_lines(
             agent_state.current_thought,
             DEFAULT_THOUGHT_LINES,

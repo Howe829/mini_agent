@@ -56,7 +56,9 @@ class ToolBase(ABC):
                 asyncio.get_running_loop()
             except RuntimeError:
                 return asyncio.run(self.__call__(parameters))
-            raise RuntimeError("Async tool cannot be called from sync context with a running event loop")
+            raise RuntimeError(
+                "Async tool cannot be called from sync context with a running event loop"
+            )
         return self.__call__(parameters)
 
     async def call_async(self, func_args: str) -> ToolReturnValue:

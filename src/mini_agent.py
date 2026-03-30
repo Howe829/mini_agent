@@ -11,7 +11,6 @@ from src.llm.openai import AsyncOpenAiLike
 from src.types.state import AgentState, ToolCallInfo, UsageInfo
 
 
-
 class MiniAgent:
     def __init__(self, tool_set: ToolSet | None = None):
         config: MiniAgentConfig = load_config()
@@ -40,33 +39,29 @@ class MiniAgent:
             return isinstance(result, (dict, list))
         except (ValueError, TypeError):
             return False
-    
+
     def add_message(self, message: dict):
-        message = cast(
-            ChatCompletionMessageParam,
-            message
-        )
+        message = cast(ChatCompletionMessageParam, message)
         self._messages.append(message)
-        
+
     def _collect_usage_info(self, event):
         usage = event.usage
-        
+
         if usage is None:
             return None
-        
+
         usage_info = UsageInfo(
             model=event.model,
             total_tokens=usage.total_tokens,
-            elapsed=time.time() - event.created
+            elapsed=time.time() - event.created,
         )
         return usage_info
-    
+
     def _collect_tool_calls(self, delta: ChoiceDelta, final_tool_calls: dict):
         for tool_call_ in delta.tool_calls:
-            
             if tool_call_.function is None:
                 continue
-            
+
             index = tool_call_.index
             if index not in final_tool_calls:
                 final_tool_calls[index] = tool_call_
@@ -91,7 +86,7 @@ class MiniAgent:
 
             final_tool_calls[index].function.arguments = arguments + incoming_arguments
         return final_tool_calls
-    
+
     async def _handle_tool_calls(self, final_tool_calls: list) -> list:
         tool_call_infos = []
         for tool_call in final_tool_calls:
@@ -106,7 +101,7 @@ class MiniAgent:
                     function_name=tool_call.function.name,
                     elapsed=time.perf_counter() - start,
                     is_error=result.is_error,
-                    error_message=result.output if result.is_error else ""
+                    error_message=result.output if result.is_error else "",
                 )
             )
             self.add_message(
@@ -117,7 +112,7 @@ class MiniAgent:
                 }
             )
         return tool_call_infos
-    
+
     async def run_stream(self):
         state = AgentState()
         final_tool_calls: dict = {}
