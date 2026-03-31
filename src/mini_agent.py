@@ -63,6 +63,7 @@ class MiniAgent:
             index = tool_call_.index
             if index not in final_tool_calls:
                 final_tool_calls[index] = tool_call_
+                continue
             elif tool_call_.id:
                 final_tool_calls[index].id = tool_call_.id
 
